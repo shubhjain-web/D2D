@@ -127,7 +127,7 @@
     </div>
     <div class="chart-card">
       <div class="chart-title">D2D Adoption Trend</div>
-      <div class="chart-sub">Before quote vs After quote stacked · D2D% of GRs</div>
+      <div class="chart-sub">On Survey vs After Survey stacked · D2D% of GRs</div>
       <div class="chart-wrap"><canvas id="d2dChart"></canvas></div>
     </div>
   </div>
@@ -135,25 +135,25 @@
   <!-- D2D Adoption on Quotes -->
   <div class="adoption-card">
     <h3>D2D Adoption on Quotes</h3>
-    <p>Of all quotes shared in the selected period — how many had a D2D link, and when was it used relative to quote creation?</p>
+    <p>Of all quotes shared in the selected period — how many had a D2D link, and when was it used relative to survey start time? (Window: survey start → +3 hours = "on survey")</p>
     <div class="adoption-metrics" id="adoptionMetrics"></div>
     <div class="adop-bar-wrap" id="adoptionBar"></div>
     <div class="adop-bar-legend">
-      <div class="adop-legend-item"><div class="adop-legend-dot" style="background:#2563eb"></div>D2D Before Quote</div>
-      <div class="adop-legend-item"><div class="adop-legend-dot" style="background:#f59e0b"></div>D2D After Quote</div>
-      <div class="adop-legend-item"><div class="adop-legend-dot" style="background:#d1d5db"></div>No D2D</div>
+      <div class="adop-legend-item"><div class="adop-legend-dot" style="background:#2563eb"></div>D2D On Survey (within +3h)</div>
+      <div class="adop-legend-item"><div class="adop-legend-dot" style="background:#f59e0b"></div>D2D After Survey</div>
+      <div class="adop-legend-item"><div class="adop-legend-dot" style="background:#d1d5db"></div>No D2D / Before Survey</div>
     </div>
   </div>
 
   <div class="d2d-split">
     <div class="split-card" style="border-top:3px solid #10b981;">
-      <h3>✅ D2D Used Before Quote</h3>
-      <p>Link generated before quote creation — tool likely driving the quote</p>
+      <h3>✅ D2D Used On Survey</h3>
+      <p>Link generated within survey start + 3 hours — tool actively used during survey</p>
       <div id="beforeStats"></div>
     </div>
     <div class="split-card" style="border-top:3px solid #f59e0b;">
-      <h3>⏩ D2D Used After Quote</h3>
-      <p>Link generated after quote creation — tool used for sharing/follow-up</p>
+      <h3>⏩ D2D Used After Survey</h3>
+      <p>Link generated more than 3 hours after survey start — used for sharing/follow-up</p>
       <div id="afterStats"></div>
     </div>
   </div>
@@ -175,11 +175,11 @@
         </tr>
         <tr class="col-header">
           <th>GRs</th><th>Surveys</th><th>Quotes</th><th>Hirings</th>
-          <th class="sep">Qt D2D Before</th><th>Qt D2D After</th><th>Qt No D2D</th>
-          <th class="sep">Hi D2D Before</th><th>Hi D2D After</th><th>Hi No D2D</th>
+          <th class="sep">Qt D2D On Survey</th><th>Qt D2D After Survey</th><th>Qt No D2D</th>
+          <th class="sep">Hi D2D On Survey</th><th>Hi D2D After Survey</th><th>Hi No D2D</th>
           <th class="sep">Q2S%</th><th>H2Q%</th><th>H2G%</th>
           <th class="sep" style="background:#f0fdf4;color:#166534;">Sv w/ D2D</th><th style="background:#f0fdf4;color:#166534;">Qt w/ D2D</th><th style="background:#f0fdf4;color:#166534;">Q2S (D2D)</th><th style="background:#f0fdf4;color:#166534;">Q2S (No D2D)</th>
-          <th class="sep" style="background:#f5f3ff;color:#7c3aed;">H2Q Before</th><th style="background:#f5f3ff;color:#7c3aed;">H2Q After</th>
+          <th class="sep" style="background:#f5f3ff;color:#7c3aed;">H2Q On Survey</th><th style="background:#f5f3ff;color:#7c3aed;">H2Q After Survey</th>
         </tr>
       </thead>
       <tbody id="tableBody"></tbody>
@@ -190,9 +190,12 @@
 <script>
 // RAW data — refreshed 17 Jun 2026 (Jarvis query 483898 + D2D walldecor API)
 // d2d_links = total D2D design links shared that day (D2S numerator); d2d = unique surveys with ≥1 link
+// Classification: qt_d2d_b = D2D created within [survey_start, survey_start+3h] → "on survey"
+//                 qt_d2d_a = D2D created after survey_start+3h → "after survey"
+//                 qt_no_d2d = no D2D used, OR D2D created before survey_start → "not used"
 const RAW = [
-  // Refreshed 17 Jun 2026 — qt_d2d_b/qt_d2d_a/hi_d2d_b/hi_d2d_a now reflect real timing join
-  // (D2D link createdAt vs QUOTE_CREATION_TIME from Jarvis query 483898 + walldecor API)
+  // Refreshed 17 Jun 2026 — qt_d2d_b/qt_d2d_a/hi_d2d_b/hi_d2d_a reflect new timing logic:
+  // D2D link createdAt vs SURVEY_START_TIME+3h window (Jarvis query 483898 + walldecor API)
   {date:"2026-06-01",gr:35,sv:27,qt:18,d2d:0, qt_d2d_b:0, qt_d2d_a:0, qt_no_d2d:18,hi:8, hi_d2d_b:0,hi_d2d_a:0,hi_no_d2d:8, d2d_links:72},
   {date:"2026-06-02",gr:50,sv:46,qt:37,d2d:0, qt_d2d_b:0, qt_d2d_a:0, qt_no_d2d:37,hi:20,hi_d2d_b:0,hi_d2d_a:0,hi_no_d2d:20,d2d_links:4},
   {date:"2026-06-03",gr:72,sv:60,qt:41,d2d:2, qt_d2d_b:0, qt_d2d_a:1, qt_no_d2d:40,hi:21,hi_d2d_b:0,hi_d2d_a:0,hi_no_d2d:21,d2d_links:70},
@@ -320,12 +323,12 @@ function render(){
     <div class="adop-metric before">
       <div class="adop-metric-val">${T.qt_d2d_b}</div>
       <div class="adop-metric-pct">${pctB}%</div>
-      <div class="adop-metric-label">D2D Before Quote</div>
+      <div class="adop-metric-label">D2D On Survey (≤+3h)</div>
     </div>
     <div class="adop-metric after">
       <div class="adop-metric-val">${T.qt_d2d_a}</div>
       <div class="adop-metric-pct">${pctA}%</div>
-      <div class="adop-metric-label">D2D After Quote</div>
+      <div class="adop-metric-label">D2D After Survey (>+3h)</div>
     </div>
     <div class="adop-metric none">
       <div class="adop-metric-val">${T.qt_no_d2d}</div>
@@ -341,13 +344,13 @@ function render(){
 
   // Before/After split cards
   document.getElementById('beforeStats').innerHTML=`
-    <div class="split-stat"><span class="split-label">Quotes with D2D before</span><div><div class="split-val">${T.qt_d2d_b}</div><div class="split-sub">${pct(T.qt_d2d_b,T.qt)}% of all quotes</div></div></div>
-    <div class="split-stat"><span class="split-label">Hirings from D2D-before GRs</span><div><div class="split-val">${T.hi_d2d_b}</div><div class="split-sub">H2Q: ${badge(pct(T.hi_d2d_b,T.qt_d2d_b))}</div></div></div>
-    <div class="split-stat"><span class="split-label">GRs with D2D before (incl no quote)</span><div><div class="split-val">${agg.reduce((a,r)=>a+r.d2d_b||0,0)||T.qt_d2d_b}</div><div class="split-sub">&nbsp;</div></div></div>
+    <div class="split-stat"><span class="split-label">Quotes with D2D on survey</span><div><div class="split-val">${T.qt_d2d_b}</div><div class="split-sub">${pct(T.qt_d2d_b,T.qt)}% of all quotes</div></div></div>
+    <div class="split-stat"><span class="split-label">Hirings from D2D on-survey GRs</span><div><div class="split-val">${T.hi_d2d_b}</div><div class="split-sub">H2Q: ${badge(pct(T.hi_d2d_b,T.qt_d2d_b))}</div></div></div>
+    <div class="split-stat"><span class="split-label">GRs with D2D on survey (incl no quote)</span><div><div class="split-val">${agg.reduce((a,r)=>a+r.d2d_b||0,0)||T.qt_d2d_b}</div><div class="split-sub">&nbsp;</div></div></div>
   `;
   document.getElementById('afterStats').innerHTML=`
-    <div class="split-stat"><span class="split-label">Quotes with D2D after</span><div><div class="split-val">${T.qt_d2d_a}</div><div class="split-sub">${pct(T.qt_d2d_a,T.qt)}% of all quotes</div></div></div>
-    <div class="split-stat"><span class="split-label">Hirings from D2D-after GRs</span><div><div class="split-val">${T.hi_d2d_a}</div><div class="split-sub">H2Q: ${badge(pct(T.hi_d2d_a,T.qt_d2d_a))}</div></div></div>
+    <div class="split-stat"><span class="split-label">Quotes with D2D after survey</span><div><div class="split-val">${T.qt_d2d_a}</div><div class="split-sub">${pct(T.qt_d2d_a,T.qt)}% of all quotes</div></div></div>
+    <div class="split-stat"><span class="split-label">Hirings from D2D after-survey GRs</span><div><div class="split-val">${T.hi_d2d_a}</div><div class="split-sub">H2Q: ${badge(pct(T.hi_d2d_a,T.qt_d2d_a))}</div></div></div>
     <div class="split-stat"><span class="split-label">Quotes with no D2D at all</span><div><div class="split-val">${T.qt_no_d2d}</div><div class="split-sub">H2Q: ${badge(pct(T.hi_no_d2d,T.qt_no_d2d))}</div></div></div>
   `;
 
@@ -405,8 +408,8 @@ function render(){
   dChart=new Chart(document.getElementById('d2dChart'),{
     type:'bar',
     data:{labels,datasets:[
-      {label:'D2D Before Quote',data:agg.map(r=>r.qt_d2d_b),backgroundColor:'rgba(16,185,129,0.8)',borderRadius:4,stack:'s'},
-      {label:'D2D After Quote',data:agg.map(r=>r.qt_d2d_a),backgroundColor:'rgba(245,158,11,0.8)',borderRadius:4,stack:'s'},
+      {label:'D2D On Survey',data:agg.map(r=>r.qt_d2d_b),backgroundColor:'rgba(16,185,129,0.8)',borderRadius:4,stack:'s'},
+      {label:'D2D After Survey',data:agg.map(r=>r.qt_d2d_a),backgroundColor:'rgba(245,158,11,0.8)',borderRadius:4,stack:'s'},
       {label:'No D2D (quoted)',data:agg.map(r=>r.qt_no_d2d),backgroundColor:'rgba(209,213,219,0.6)',borderRadius:4,stack:'s'},
       {label:'D2D % of GRs',data:agg.map(r=>pctNum(r.d2d,r.gr)),type:'line',borderColor:'#8b5cf6',tension:0.4,yAxisID:'y2',pointRadius:3,borderWidth:2},
     ]},
