@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>D2D Adoption Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; color: #1a1a2e; }
+  .header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: white; padding: 20px 32px; display: flex; align-items: center; justify-content: space-between; }
+  .header h1 { font-size: 22px; font-weight: 700; }
+  .header p { font-size: 13px; opacity: 0.7; margin-top: 2px; }
+  .controls { background: white; padding: 14px 32px; display: flex; gap: 12px; align-items: center; border-bottom: 1px solid #e5e7eb; flex-wrap: wrap; }
+  .controls label { font-size: 13px; color: #6b7280; font-weight: 500; }
+  .controls select, .controls input { border: 1px solid #d1d5db; border-radius: 8px; padding: 7px 12px; font-size: 13px; color: #1a1a2e; background: #f9fafb; cursor: pointer; }
+  .controls select:focus, .controls input:focus { outline: none; border-color: #6366f1; }
+  .container { padding: 24px 32px; max-width: 1500px; margin: 0 auto; }
+
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-bottom: 24px; }
+  .kpi { background: white; border-radius: 12px; padding: 16px 18px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); border-left: 4px solid transparent; }
+  .kpi.blue { border-color: #6366f1; } .kpi.green { border-color: #10b981; }
+  .kpi.orange { border-color: #f59e0b; } .kpi.red { border-color: #ef4444; }
+  .kpi.purple { border-color: #8b5cf6; } .kpi.teal { border-color: #06b6d4; }
+  .kpi-label { font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; }
+  .kpi-value { font-size: 26px; font-weight: 700; color: #1a1a2e; line-height: 1; }
+  .kpi-pct { font-size: 12px; color: #10b981; font-weight: 600; margin-top: 4px; }
+
+  .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; }
+  .chart-card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+  .chart-card.full { grid-column: 1 / -1; }
+  .chart-title { font-size: 14px; font-weight: 600; color: #1a1a2e; margin-bottom: 2px; }
+  .chart-sub { font-size: 12px; color: #9ca3af; margin-bottom: 14px; }
+  .chart-wrap { position: relative; height: 250px; }
+
+  .section-title { font-size: 15px; font-weight: 700; color: #1a1a2e; margin-bottom: 14px; }
+  .table-card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); margin-bottom: 24px; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; white-space: nowrap; }
+  thead tr.group-header th { background: #1a1a2e; color: white; font-size: 11px; font-weight: 600; text-align: center; padding: 8px 10px; }
+  thead tr.group-header th:first-child { text-align: left; border-radius: 8px 0 0 0; }
+  thead tr.col-header th { background: #f8fafc; color: #6b7280; font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: 0.4px; padding: 7px 10px; text-align: right; border-bottom: 2px solid #e5e7eb; }
+  thead tr.col-header th:first-child { text-align: left; }
+  tbody td { padding: 9px 10px; border-bottom: 1px solid #f1f5f9; text-align: right; }
+  tbody td:first-child { text-align: left; font-weight: 600; color: #374151; }
+  tbody tr:hover { background: #f8fafc; }
+  tbody tr.total-row td { font-weight: 700; background: #eff6ff; border-top: 2px solid #c7d2fe; }
+  .pct-badge { display: inline-block; padding: 2px 7px; border-radius: 999px; font-size: 10px; font-weight: 600; }
+  .pct-high { background: #d1fae5; color: #065f46; }
+  .pct-mid { background: #fef3c7; color: #92400e; }
+  .pct-low { background: #fee2e2; color: #991b1b; }
+  .pct-na { background: #f3f4f6; color: #9ca3af; }
+  .sep { border-left: 2px solid #e5e7eb !important; }
+
+  .d2d-split { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; }
+  .split-card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+  .split-card h3 { font-size: 14px; font-weight: 600; margin-bottom: 3px; }
+  .split-card p { font-size: 12px; color: #9ca3af; margin-bottom: 14px; }
+  .split-stat { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #f1f5f9; }
+  .split-stat:last-child { border-bottom: none; }
+  .split-label { font-size: 13px; color: #374151; }
+  .split-val { font-size: 20px; font-weight: 700; color: #1a1a2e; }
+  .split-sub { font-size: 11px; color: #9ca3af; }
+
+  /* D2D on Quotes adoption bar */
+  .adoption-card { background: white; border-radius: 12px; padding: 20px 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); margin-bottom: 24px; }
+  .adoption-card h3 { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+  .adoption-card p { font-size: 12px; color: #9ca3af; margin-bottom: 18px; }
+  .adoption-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
+  .adop-metric { text-align: center; padding: 14px; border-radius: 10px; }
+  .adop-metric.total  { background: #eff6ff; border: 1px solid #bfdbfe; }
+  .adop-metric.before { background: #f0fdf4; border: 1px solid #bbf7d0; }
+  .adop-metric.after  { background: #fffbeb; border: 1px solid #fde68a; }
+  .adop-metric.none   { background: #f9fafb; border: 1px solid #e5e7eb; }
+  .adop-metric-val  { font-size: 28px; font-weight: 800; line-height: 1; }
+  .adop-metric.total  .adop-metric-val { color: #2563eb; }
+  .adop-metric.before .adop-metric-val { color: #16a34a; }
+  .adop-metric.after  .adop-metric-val { color: #d97706; }
+  .adop-metric.none   .adop-metric-val { color: #6b7280; }
+  .adop-metric-pct  { font-size: 18px; font-weight: 700; margin-top: 2px; }
+  .adop-metric.total  .adop-metric-pct { color: #3b82f6; }
+  .adop-metric.before .adop-metric-pct { color: #22c55e; }
+  .adop-metric.after  .adop-metric-pct { color: #f59e0b; }
+  .adop-metric.none   .adop-metric-pct { color: #9ca3af; }
+  .adop-metric-label { font-size: 11px; color: #6b7280; font-weight: 600; margin-top: 6px; text-transform: uppercase; letter-spacing: 0.4px; }
+  .adop-bar-wrap { height: 28px; background: #f1f5f9; border-radius: 999px; overflow: hidden; display: flex; }
+  .adop-bar-seg { height: 100%; transition: width 0.4s ease; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: white; overflow: hidden; white-space: nowrap; }
+  .adop-bar-legend { display: flex; gap: 16px; margin-top: 10px; flex-wrap: wrap; }
+  .adop-legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #374151; }
+  .adop-legend-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+
+  @media (max-width: 900px) { .charts-grid, .d2d-split { grid-template-columns: 1fr; } .container { padding: 16px; } }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div><h1>D2D Tool Adoption Dashboard</h1><p>RM Funnel · June 2026 · Painting Services</p></div>
+  <div style="font-size:12px;opacity:0.6;">Last updated: Jun 16, 2026</div>
+</div>
+
+<div class="controls">
+  <label>View by:</label>
+  <select id="granularity" onchange="render()">
+    <option value="daily">Daily</option>
+    <option value="weekly">Weekly</option>
+    <option value="monthly">Monthly</option>
+  </select>
+  <label style="margin-left:12px;">From:</label>
+  <input type="date" id="fromDate" value="2026-06-01" onchange="render()">
+  <label>To:</label>
+  <input type="date" id="toDate" value="2026-06-16" onchange="render()">
+</div>
+
+<div class="container">
+  <div class="kpi-grid" id="kpiGrid"></div>
+
+  <div class="charts-grid">
+    <div class="chart-card full">
+      <div class="chart-title">Funnel Trend</div>
+      <div class="chart-sub">GRs · Surveys · Quotes · Hirings · D2D Used by period</div>
+      <div class="chart-wrap"><canvas id="funnelChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Conversion Rates</div>
+      <div class="chart-sub">Q2S%, H2Q%, H2G% over time</div>
+      <div class="chart-wrap"><canvas id="convChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">D2D Adoption Trend</div>
+      <div class="chart-sub">Before quote vs After quote stacked · D2D% of GRs</div>
+      <div class="chart-wrap"><canvas id="d2dChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- D2D Adoption on Quotes -->
+  <div class="adoption-card">
+    <h3>D2D Adoption on Quotes</h3>
+    <p>Of all quotes shared in the selected period — how many had a D2D link, and when was it used relative to quote creation?</p>
+    <div class="adoption-metrics" id="adoptionMetrics"></div>
+    <div class="adop-bar-wrap" id="adoptionBar"></div>
+    <div class="adop-bar-legend">
+      <div class="adop-legend-item"><div class="adop-legend-dot" style="background:#2563eb"></div>D2D Before Quote</div>
+      <div class="adop-legend-item"><div class="adop-legend-dot" style="background:#f59e0b"></div>D2D After Quote</div>
+      <div class="adop-legend-item"><div class="adop-legend-dot" style="background:#d1d5db"></div>No D2D</div>
+    </div>
+  </div>
+
+  <div class="d2d-split">
+    <div class="split-card" style="border-top:3px solid #10b981;">
+      <h3>✅ D2D Used Before Quote</h3>
+      <p>Link generated before quote creation — tool likely driving the quote</p>
+      <div id="beforeStats"></div>
+    </div>
+    <div class="split-card" style="border-top:3px solid #f59e0b;">
+      <h3>⏩ D2D Used After Quote</h3>
+      <p>Link generated after quote creation — tool used for sharing/follow-up</p>
+      <div id="afterStats"></div>
+    </div>
+  </div>
+
+  <div class="adoption-card" id="q2sInsight" style="margin-bottom:24px;"></div>
+
+  <div class="section-title">Daily Funnel Breakdown</div>
+  <div class="table-card">
+    <table>
+      <thead>
+        <tr class="group-header">
+          <th rowspan="2" style="min-width:90px;">Period</th>
+          <th colspan="4">Funnel (Survey Date)</th>
+          <th colspan="3" class="sep">Quotes Breakdown</th>
+          <th colspan="3" class="sep">Hirings Breakdown (Hiring Date)</th>
+          <th colspan="3" class="sep">Conversion %</th>
+          <th colspan="4" class="sep" style="background:#166534;color:white;">Q2S by D2D Usage</th>
+          <th colspan="2" class="sep" style="background:#7c3aed;color:white;">H2Q by D2D Timing</th>
+        </tr>
+        <tr class="col-header">
+          <th>GRs</th><th>Surveys</th><th>Quotes</th><th>Hirings</th>
+          <th class="sep">Qt D2D Before</th><th>Qt D2D After</th><th>Qt No D2D</th>
+          <th class="sep">Hi D2D Before</th><th>Hi D2D After</th><th>Hi No D2D</th>
+          <th class="sep">Q2S%</th><th>H2Q%</th><th>H2G%</th>
+          <th class="sep" style="background:#f0fdf4;color:#166534;">Sv w/ D2D</th><th style="background:#f0fdf4;color:#166534;">Qt w/ D2D</th><th style="background:#f0fdf4;color:#166534;">Q2S (D2D)</th><th style="background:#f0fdf4;color:#166534;">Q2S (No D2D)</th>
+          <th class="sep" style="background:#f5f3ff;color:#7c3aed;">H2Q Before</th><th style="background:#f5f3ff;color:#7c3aed;">H2Q After</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+// RAW data — refreshed 17 Jun 2026 (Jarvis query 483898 + D2D walldecor API)
+// d2d_links = total D2D design links shared that day (D2S numerator); d2d = unique surveys with ≥1 link
+const RAW = [
+  // Refreshed 17 Jun 2026 — qt_d2d_b/qt_d2d_a/hi_d2d_b/hi_d2d_a now reflect real timing join
+  // (D2D link createdAt vs QUOTE_CREATION_TIME from Jarvis query 483898 + walldecor API)
+  {date:"2026-06-01",gr:35,sv:27,qt:18,d2d:0, qt_d2d_b:0, qt_d2d_a:0, qt_no_d2d:18,hi:8, hi_d2d_b:0,hi_d2d_a:0,hi_no_d2d:8, d2d_links:72},
+  {date:"2026-06-02",gr:50,sv:46,qt:37,d2d:0, qt_d2d_b:0, qt_d2d_a:0, qt_no_d2d:37,hi:20,hi_d2d_b:0,hi_d2d_a:0,hi_no_d2d:20,d2d_links:4},
+  {date:"2026-06-03",gr:72,sv:60,qt:41,d2d:2, qt_d2d_b:0, qt_d2d_a:1, qt_no_d2d:40,hi:21,hi_d2d_b:0,hi_d2d_a:0,hi_no_d2d:21,d2d_links:70},
+  {date:"2026-06-04",gr:68,sv:63,qt:41,d2d:1, qt_d2d_b:1, qt_d2d_a:0, qt_no_d2d:40,hi:19,hi_d2d_b:0,hi_d2d_a:0,hi_no_d2d:19,d2d_links:55},
+  {date:"2026-06-05",gr:69,sv:55,qt:40,d2d:3, qt_d2d_b:0, qt_d2d_a:2, qt_no_d2d:38,hi:14,hi_d2d_b:0,hi_d2d_a:0,hi_no_d2d:14,d2d_links:95},
+  {date:"2026-06-06",gr:89,sv:74,qt:55,d2d:2, qt_d2d_b:0, qt_d2d_a:2, qt_no_d2d:53,hi:25,hi_d2d_b:0,hi_d2d_a:0,hi_no_d2d:25,d2d_links:74},
+  {date:"2026-06-07",gr:93,sv:80,qt:61,d2d:3, qt_d2d_b:1, qt_d2d_a:1, qt_no_d2d:59,hi:29,hi_d2d_b:1,hi_d2d_a:0,hi_no_d2d:28,d2d_links:62},
+  {date:"2026-06-08",gr:75,sv:65,qt:51,d2d:2, qt_d2d_b:1, qt_d2d_a:1, qt_no_d2d:49,hi:21,hi_d2d_b:0,hi_d2d_a:0,hi_no_d2d:21,d2d_links:42},
+  {date:"2026-06-09",gr:67,sv:59,qt:46,d2d:3, qt_d2d_b:2, qt_d2d_a:1, qt_no_d2d:43,hi:25,hi_d2d_b:1,hi_d2d_a:0,hi_no_d2d:24,d2d_links:8},
+  {date:"2026-06-10",gr:71,sv:58,qt:39,d2d:3, qt_d2d_b:1, qt_d2d_a:1, qt_no_d2d:37,hi:13,hi_d2d_b:1,hi_d2d_a:0,hi_no_d2d:12,d2d_links:9},
+  {date:"2026-06-11",gr:64,sv:54,qt:39,d2d:4, qt_d2d_b:3, qt_d2d_a:2, qt_no_d2d:34,hi:14,hi_d2d_b:1,hi_d2d_a:0,hi_no_d2d:13,d2d_links:14},
+  {date:"2026-06-12",gr:60,sv:54,qt:43,d2d:13,qt_d2d_b:10,qt_d2d_a:2, qt_no_d2d:31,hi:17,hi_d2d_b:5,hi_d2d_a:0,hi_no_d2d:12,d2d_links:78},
+  {date:"2026-06-13",gr:84,sv:74,qt:52,d2d:14,qt_d2d_b:10,qt_d2d_a:1, qt_no_d2d:41,hi:23,hi_d2d_b:5,hi_d2d_a:0,hi_no_d2d:18,d2d_links:180},
+  {date:"2026-06-14",gr:94,sv:80,qt:54,d2d:17,qt_d2d_b:13,qt_d2d_a:1, qt_no_d2d:40,hi:17,hi_d2d_b:3,hi_d2d_a:0,hi_no_d2d:14,d2d_links:109},
+  {date:"2026-06-15",gr:65,sv:52,qt:37,d2d:17,qt_d2d_b:13,qt_d2d_a:1, qt_no_d2d:23,hi:17,hi_d2d_b:2,hi_d2d_a:1,hi_no_d2d:14,d2d_links:91},
+  {date:"2026-06-16",gr:51,sv:35,qt:26,d2d:9, qt_d2d_b:9, qt_d2d_a:0, qt_no_d2d:17,hi:9, hi_d2d_b:2,hi_d2d_a:0,hi_no_d2d:7, d2d_links:114},
+  {date:"2026-06-17",gr:57,sv:11,qt:0, d2d:3, qt_d2d_b:0, qt_d2d_a:0, qt_no_d2d:0, hi:0, hi_d2d_b:0,hi_d2d_a:0,hi_no_d2d:0, d2d_links:10},
+];
+
+function pct(n,d){ return d>0 ? (n/d*100).toFixed(1) : null; }
+function pctNum(n,d){ return d>0 ? parseFloat((n/d*100).toFixed(1)) : 0; }
+function badge(v){
+  if(v===null||v===undefined) return `<span class="pct-badge pct-na">—</span>`;
+  const n=parseFloat(v);
+  const cls = n>=70?'pct-high':n>=40?'pct-mid':'pct-low';
+  return `<span class="pct-badge ${cls}">${v}%</span>`;
+}
+function weekKey(d){ const dt=new Date(d),day=dt.getDay(),diff=dt.getDate()-day+(day===0?-6:1),m=new Date(dt.setDate(diff)); return m.toISOString().slice(0,10); }
+function monthKey(d){ return d.slice(0,7); }
+
+function getFiltered(){
+  const from=document.getElementById('fromDate').value, to=document.getElementById('toDate').value;
+  return RAW.filter(r=>r.date>=from&&r.date<=to);
+}
+
+function aggregate(rows,gran){
+  const map={};
+  for(const r of rows){
+    const key=gran==='daily'?r.date:gran==='weekly'?weekKey(r.date):monthKey(r.date);
+    if(!map[key]) map[key]={label:key,gr:0,sv:0,qt:0,d2d:0,qt_d2d_b:0,qt_d2d_a:0,qt_no_d2d:0,hi:0,hi_d2d_b:0,hi_d2d_a:0,hi_no_d2d:0,d2d_links:0};
+    const m=map[key];
+    m.gr+=r.gr; m.sv+=r.sv; m.qt+=r.qt; m.d2d+=r.d2d;
+    m.qt_d2d_b+=r.qt_d2d_b; m.qt_d2d_a+=r.qt_d2d_a; m.qt_no_d2d+=r.qt_no_d2d;
+    m.hi+=r.hi; m.hi_d2d_b+=r.hi_d2d_b; m.hi_d2d_a+=r.hi_d2d_a; m.hi_no_d2d+=r.hi_no_d2d;
+    m.d2d_links+=(r.d2d_links||0);
+  }
+  return Object.values(map).sort((a,b)=>a.label.localeCompare(b.label));
+}
+
+let fChart,cChart,dChart;
+function destroyCharts(){ [fChart,cChart,dChart].forEach(c=>{if(c)c.destroy();}); }
+
+function render(){
+  const gran=document.getElementById('granularity').value;
+  const agg=aggregate(getFiltered(),gran);
+  const T=agg.reduce((a,r)=>({
+    gr:a.gr+r.gr,sv:a.sv+r.sv,qt:a.qt+r.qt,d2d:a.d2d+r.d2d,
+    qt_d2d_b:a.qt_d2d_b+r.qt_d2d_b,qt_d2d_a:a.qt_d2d_a+r.qt_d2d_a,qt_no_d2d:a.qt_no_d2d+r.qt_no_d2d,
+    hi:a.hi+r.hi,hi_d2d_b:a.hi_d2d_b+r.hi_d2d_b,hi_d2d_a:a.hi_d2d_a+r.hi_d2d_a,hi_no_d2d:a.hi_no_d2d+r.hi_no_d2d,
+    d2d_links:a.d2d_links+(r.d2d_links||0)
+  }),{gr:0,sv:0,qt:0,d2d:0,qt_d2d_b:0,qt_d2d_a:0,qt_no_d2d:0,hi:0,hi_d2d_b:0,hi_d2d_a:0,hi_no_d2d:0,d2d_links:0});
+  const T_qt_d2d=T.qt_d2d_b+T.qt_d2d_a, T_sv_no_d2d=T.sv-T.d2d;
+
+  // KPIs
+  document.getElementById('kpiGrid').innerHTML=`
+    <div class="kpi blue"><div class="kpi-label">GRs</div><div class="kpi-value">${T.gr}</div><div class="kpi-pct" style="color:#6366f1">Total Requests</div></div>
+    <div class="kpi green"><div class="kpi-label">Surveys</div><div class="kpi-value">${T.sv}</div><div class="kpi-pct">${pct(T.sv,T.gr)}% of GRs</div></div>
+    <div class="kpi orange"><div class="kpi-label">Quotes</div><div class="kpi-value">${T.qt}</div><div class="kpi-pct">Q2S: ${pct(T.qt,T.sv)}%</div></div>
+    <div class="kpi red"><div class="kpi-label">Hirings</div><div class="kpi-value">${T.hi}</div><div class="kpi-pct">H2G: ${pct(T.hi,T.gr)}%</div></div>
+    <div class="kpi purple"><div class="kpi-label">D2D Links Shared</div><div class="kpi-value">${T.d2d_links}</div><div class="kpi-pct">D2S: ${pct(T.d2d_links,T.sv)}% links/survey · ${T.d2d} surveys used</div></div>
+    <div class="kpi teal"><div class="kpi-label">H2Q %</div><div class="kpi-value">${pct(T.hi,T.qt)}%</div><div class="kpi-pct">${T.hi} of ${T.qt} quotes</div></div>
+    <div class="kpi green"><div class="kpi-label">Q2S — D2D Used</div><div class="kpi-value">${pct(T_qt_d2d,T.d2d)||'—'}%</div><div class="kpi-pct">${T_qt_d2d} of ${T.d2d} surveys</div></div>
+    <div class="kpi" style="border-color:#9ca3af;"><div class="kpi-label">Q2S — No D2D</div><div class="kpi-value">${pct(T.qt_no_d2d,T_sv_no_d2d)||'—'}%</div><div class="kpi-pct">${T.qt_no_d2d} of ${T_sv_no_d2d} surveys</div></div>
+  `;
+
+  // Q2S insight card
+  const q2s_d2d_pct = pct(T_qt_d2d, T.d2d);
+  const q2s_nod2d_pct = pct(T.qt_no_d2d, T_sv_no_d2d);
+  const d2d_not_quoted = T.d2d - T_qt_d2d;
+  const delta = q2s_d2d_pct !== null && q2s_nod2d_pct !== null ? (parseFloat(q2s_d2d_pct) - parseFloat(q2s_nod2d_pct)).toFixed(1) : null;
+  document.getElementById('q2sInsight').innerHTML = `
+    <h3>Q2S: D2D Used vs Not Used</h3>
+    <p>Of surveys where D2D was used — how many converted to a quote? Compare with surveys where D2D was never used.</p>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:8px;">
+      <div class="adop-metric before">
+        <div class="adop-metric-val">${T.d2d_links}</div>
+        <div class="adop-metric-pct">D2S: ${pct(T.d2d_links,T.sv)}% links/sv</div>
+        <div class="adop-metric-label">Surveys w/ D2D</div>
+      </div>
+      <div class="adop-metric before" style="background:#dcfce7;">
+        <div class="adop-metric-val" style="color:#15803d;">${q2s_d2d_pct||'—'}%</div>
+        <div class="adop-metric-pct" style="color:#16a34a;">Q2S (D2D used)</div>
+        <div class="adop-metric-label">${T_qt_d2d} of ${T.d2d} surveyed → quoted</div>
+      </div>
+      <div class="adop-metric none">
+        <div class="adop-metric-val">${q2s_nod2d_pct||'—'}%</div>
+        <div class="adop-metric-pct" style="color:#6b7280;">Q2S (No D2D)</div>
+        <div class="adop-metric-label">${T.qt_no_d2d} of ${T_sv_no_d2d} surveyed → quoted</div>
+      </div>
+      <div class="adop-metric" style="background:#fef9c3;border:1px solid #fde047;text-align:center;padding:14px;border-radius:10px;">
+        <div class="adop-metric-val" style="font-size:24px;color:#854d0e;">${d2d_not_quoted}</div>
+        <div class="adop-metric-pct" style="color:#a16207;">D2D used, no quote</div>
+        <div class="adop-metric-label">${pct(d2d_not_quoted,T.d2d)}% of D2D surveys didn't convert</div>
+      </div>
+    </div>
+    ${delta !== null ? `<p style="margin-top:14px;font-size:13px;color:#374151;">
+      <strong style="color:${parseFloat(delta)>=0?'#15803d':'#dc2626'}">${parseFloat(delta)>=0?'+':''}${delta} pp</strong>
+      difference — surveys with D2D used convert to quotes at <strong>${q2s_d2d_pct}%</strong> vs <strong>${q2s_nod2d_pct}%</strong> without D2D.
+    </p>` : ''}
+  `;
+
+  // D2D Adoption on Quotes section
+  const qt_d2d_total = T.qt_d2d_b + T.qt_d2d_a;
+  const pctB = T.qt > 0 ? (T.qt_d2d_b / T.qt * 100).toFixed(1) : 0;
+  const pctA = T.qt > 0 ? (T.qt_d2d_a / T.qt * 100).toFixed(1) : 0;
+  const pctT = T.qt > 0 ? (qt_d2d_total / T.qt * 100).toFixed(1) : 0;
+  const pctN = T.qt > 0 ? (T.qt_no_d2d / T.qt * 100).toFixed(1) : 0;
+
+  document.getElementById('adoptionMetrics').innerHTML = `
+    <div class="adop-metric total">
+      <div class="adop-metric-val">${qt_d2d_total}</div>
+      <div class="adop-metric-pct">${pctT}%</div>
+      <div class="adop-metric-label">D2D on Quotes (Total)</div>
+    </div>
+    <div class="adop-metric before">
+      <div class="adop-metric-val">${T.qt_d2d_b}</div>
+      <div class="adop-metric-pct">${pctB}%</div>
+      <div class="adop-metric-label">D2D Before Quote</div>
+    </div>
+    <div class="adop-metric after">
+      <div class="adop-metric-val">${T.qt_d2d_a}</div>
+      <div class="adop-metric-pct">${pctA}%</div>
+      <div class="adop-metric-label">D2D After Quote</div>
+    </div>
+    <div class="adop-metric none">
+      <div class="adop-metric-val">${T.qt_no_d2d}</div>
+      <div class="adop-metric-pct">${pctN}%</div>
+      <div class="adop-metric-label">No D2D Used</div>
+    </div>
+  `;
+  document.getElementById('adoptionBar').innerHTML = `
+    <div class="adop-bar-seg" style="width:${pctB}%;background:#2563eb;">${pctB > 5 ? pctB+'%' : ''}</div>
+    <div class="adop-bar-seg" style="width:${pctA}%;background:#f59e0b;">${pctA > 5 ? pctA+'%' : ''}</div>
+    <div class="adop-bar-seg" style="width:${pctN}%;background:#d1d5db;color:#6b7280;">${pctN > 8 ? pctN+'%' : ''}</div>
+  `;
+
+  // Before/After split cards
+  document.getElementById('beforeStats').innerHTML=`
+    <div class="split-stat"><span class="split-label">Quotes with D2D before</span><div><div class="split-val">${T.qt_d2d_b}</div><div class="split-sub">${pct(T.qt_d2d_b,T.qt)}% of all quotes</div></div></div>
+    <div class="split-stat"><span class="split-label">Hirings from D2D-before GRs</span><div><div class="split-val">${T.hi_d2d_b}</div><div class="split-sub">H2Q: ${badge(pct(T.hi_d2d_b,T.qt_d2d_b))}</div></div></div>
+    <div class="split-stat"><span class="split-label">GRs with D2D before (incl no quote)</span><div><div class="split-val">${agg.reduce((a,r)=>a+r.d2d_b||0,0)||T.qt_d2d_b}</div><div class="split-sub">&nbsp;</div></div></div>
+  `;
+  document.getElementById('afterStats').innerHTML=`
+    <div class="split-stat"><span class="split-label">Quotes with D2D after</span><div><div class="split-val">${T.qt_d2d_a}</div><div class="split-sub">${pct(T.qt_d2d_a,T.qt)}% of all quotes</div></div></div>
+    <div class="split-stat"><span class="split-label">Hirings from D2D-after GRs</span><div><div class="split-val">${T.hi_d2d_a}</div><div class="split-sub">H2Q: ${badge(pct(T.hi_d2d_a,T.qt_d2d_a))}</div></div></div>
+    <div class="split-stat"><span class="split-label">Quotes with no D2D at all</span><div><div class="split-val">${T.qt_no_d2d}</div><div class="split-sub">H2Q: ${badge(pct(T.hi_no_d2d,T.qt_no_d2d))}</div></div></div>
+  `;
+
+  // Table
+  let html='';
+  for(const r of agg){
+    const r_qt_d2d=r.qt_d2d_b+r.qt_d2d_a, r_sv_no_d2d=r.sv-r.d2d;
+    html+=`<tr>
+      <td>${r.label}</td>
+      <td>${r.gr}</td><td>${r.sv}</td><td>${r.qt}</td><td>${r.hi}</td>
+      <td class="sep">${r.qt_d2d_b}</td><td>${r.qt_d2d_a}</td><td>${r.qt_no_d2d}</td>
+      <td class="sep">${r.hi_d2d_b}</td><td>${r.hi_d2d_a}</td><td>${r.hi_no_d2d}</td>
+      <td class="sep">${badge(pct(r.qt,r.sv))}</td><td>${badge(pct(r.hi,r.qt))}</td><td>${badge(pct(r.hi,r.gr))}</td>
+      <td class="sep" style="background:#f0fdf4;">${r.d2d}</td><td style="background:#f0fdf4;">${r_qt_d2d}</td><td style="background:#f0fdf4;">${badge(pct(r_qt_d2d,r.d2d))}</td><td style="background:#f0fdf4;">${badge(pct(r.qt_no_d2d,r_sv_no_d2d))}</td>
+      <td class="sep" style="background:#f5f3ff;">${badge(pct(r.hi_d2d_b,r.qt_d2d_b))}</td><td style="background:#f5f3ff;">${badge(pct(r.hi_d2d_a,r.qt_d2d_a))}</td>
+    </tr>`;
+  }
+  html+=`<tr class="total-row">
+    <td>TOTAL</td>
+    <td>${T.gr}</td><td>${T.sv}</td><td>${T.qt}</td><td>${T.hi}</td>
+    <td class="sep">${T.qt_d2d_b}</td><td>${T.qt_d2d_a}</td><td>${T.qt_no_d2d}</td>
+    <td class="sep">${T.hi_d2d_b}</td><td>${T.hi_d2d_a}</td><td>${T.hi_no_d2d}</td>
+    <td class="sep">${badge(pct(T.qt,T.sv))}</td><td>${badge(pct(T.hi,T.qt))}</td><td>${badge(pct(T.hi,T.gr))}</td>
+    <td class="sep" style="background:#dcfce7;">${T.d2d}</td><td style="background:#dcfce7;">${T_qt_d2d}</td><td style="background:#dcfce7;">${badge(pct(T_qt_d2d,T.d2d))}</td><td style="background:#dcfce7;">${badge(pct(T.qt_no_d2d,T_sv_no_d2d))}</td>
+    <td class="sep" style="background:#ede9fe;">${badge(pct(T.hi_d2d_b,T.qt_d2d_b))}</td><td style="background:#ede9fe;">${badge(pct(T.hi_d2d_a,T.qt_d2d_a))}</td>
+  </tr>`;
+  document.getElementById('tableBody').innerHTML=html;
+
+  // Charts
+  destroyCharts();
+  const labels=agg.map(r=>r.label);
+
+  fChart=new Chart(document.getElementById('funnelChart'),{
+    type:'bar',
+    data:{labels,datasets:[
+      {label:'GRs',data:agg.map(r=>r.gr),backgroundColor:'rgba(99,102,241,0.15)',borderColor:'#6366f1',borderWidth:2,type:'line',tension:0.4,pointRadius:3},
+      {label:'Surveys',data:agg.map(r=>r.sv),backgroundColor:'rgba(16,185,129,0.6)',borderRadius:4},
+      {label:'Quotes',data:agg.map(r=>r.qt),backgroundColor:'rgba(245,158,11,0.7)',borderRadius:4},
+      {label:'Hirings',data:agg.map(r=>r.hi),backgroundColor:'rgba(239,68,68,0.7)',borderRadius:4},
+      {label:'D2D Used',data:agg.map(r=>r.d2d),backgroundColor:'rgba(139,92,246,0.85)',borderRadius:4},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{boxWidth:12,font:{size:11}}}},scales:{x:{grid:{display:false},ticks:{font:{size:11}}},y:{grid:{color:'#f1f5f9'},ticks:{font:{size:11}}}}}
+  });
+
+  cChart=new Chart(document.getElementById('convChart'),{
+    type:'line',
+    data:{labels,datasets:[
+      {label:'Q2S %',data:agg.map(r=>pctNum(r.qt,r.sv)),borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,0.08)',tension:0.4,pointRadius:3,fill:true},
+      {label:'H2Q %',data:agg.map(r=>pctNum(r.hi,r.qt)),borderColor:'#ef4444',backgroundColor:'rgba(239,68,68,0.08)',tension:0.4,pointRadius:3,fill:true},
+      {label:'H2G %',data:agg.map(r=>pctNum(r.hi,r.gr)),borderColor:'#6366f1',backgroundColor:'rgba(99,102,241,0.08)',tension:0.4,pointRadius:3,fill:true},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{boxWidth:12,font:{size:11}}}},scales:{x:{grid:{display:false},ticks:{font:{size:11}}},y:{grid:{color:'#f1f5f9'},ticks:{font:{size:11},callback:v=>v+'%'},max:100}}}
+  });
+
+  dChart=new Chart(document.getElementById('d2dChart'),{
+    type:'bar',
+    data:{labels,datasets:[
+      {label:'D2D Before Quote',data:agg.map(r=>r.qt_d2d_b),backgroundColor:'rgba(16,185,129,0.8)',borderRadius:4,stack:'s'},
+      {label:'D2D After Quote',data:agg.map(r=>r.qt_d2d_a),backgroundColor:'rgba(245,158,11,0.8)',borderRadius:4,stack:'s'},
+      {label:'No D2D (quoted)',data:agg.map(r=>r.qt_no_d2d),backgroundColor:'rgba(209,213,219,0.6)',borderRadius:4,stack:'s'},
+      {label:'D2D % of GRs',data:agg.map(r=>pctNum(r.d2d,r.gr)),type:'line',borderColor:'#8b5cf6',tension:0.4,yAxisID:'y2',pointRadius:3,borderWidth:2},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{boxWidth:12,font:{size:11}}}},
+      scales:{
+        x:{grid:{display:false},ticks:{font:{size:11}},stacked:true},
+        y:{grid:{color:'#f1f5f9'},ticks:{font:{size:11}},stacked:true},
+        y2:{position:'right',ticks:{font:{size:11},callback:v=>v+'%'},grid:{display:false}}
+      }
+    }
+  });
+}
+
+render();
+</script>
+</body>
+</html>
