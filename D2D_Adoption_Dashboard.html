@@ -94,8 +94,8 @@
 <body>
 
 <div class="header">
-  <div><h1>D2D Tool Adoption Dashboard</h1><p>RM Funnel · June 2026 · Painting Services</p></div>
-  <div style="font-size:12px;opacity:0.6;">Last updated: Jun 17, 2026</div>
+  <div><h1>D2D Tool Adoption Dashboard</h1><p id="headerSub">RM Funnel · Painting Services</p></div>
+  <div style="font-size:12px;opacity:0.6;" id="lastUpdated"></div>
 </div>
 
 <div class="controls">
@@ -106,9 +106,9 @@
     <option value="monthly">Monthly</option>
   </select>
   <label style="margin-left:12px;">From:</label>
-  <input type="date" id="fromDate" value="2026-06-01" onchange="render()">
+  <input type="date" id="fromDate" onchange="render()">
   <label>To:</label>
-  <input type="date" id="toDate" value="2026-06-17" onchange="render()">
+  <input type="date" id="toDate" onchange="render()">
 </div>
 
 <div class="container">
@@ -422,6 +422,29 @@ function render(){
     }
   });
 }
+
+// Set dynamic defaults
+(function initDates(){
+  const today = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  const fmt = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+
+  // Default to latest date in RAW that is ≤ today
+  const todayStr = fmt(today);
+  const available = RAW.map(r=>r.date).filter(d=>d<=todayStr).sort();
+  const latestAvailable = available[available.length-1] || todayStr;
+
+  document.getElementById('fromDate').value = fmt(firstOfMonth);
+  document.getElementById('toDate').value = latestAvailable;
+
+  // Header
+  const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  document.getElementById('headerSub').textContent =
+    `RM Funnel · ${monthNames[today.getMonth()]} ${today.getFullYear()} · Painting Services`;
+  document.getElementById('lastUpdated').textContent =
+    `Last updated: ${monthNames[today.getMonth()]} ${today.getDate()}, ${today.getFullYear()}`;
+})();
 
 render();
 </script>
